@@ -8,11 +8,75 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   
-  <!-- Three.js r128 and official WebXR modules -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/webxr/VRButton.js"></script>
+  <!-- Vendored Three.js r128 & Core Modules (Zero external CDN dependency) -->
+  <script src="vendor/three.min.js"></script>
+  <script src="vendor/GLTFLoader.js"></script>
+  <script src="vendor/OrbitControls.js"></script>
+  <script>
+    // Sovereign Standalone VRButton implementation (Independent of external CDNs)
+    class VRButton {
+      static createButton(renderer) {
+        const button = document.createElement('button');
+
+        function showEnterVR() {
+          let currentSession = null;
+          async function onSessionStarted(session) {
+            session.addEventListener('end', onSessionEnded);
+            await renderer.xr.setSession(session);
+            button.textContent = 'EXIT VR';
+            currentSession = session;
+          }
+          function onSessionEnded() {
+            currentSession.removeEventListener('end', onSessionEnded);
+            button.textContent = 'ENTER VR';
+            currentSession = null;
+          }
+          button.style.display = '';
+          button.style.cursor = 'pointer';
+          button.textContent = 'ENTER VR';
+          button.onclick = function() {
+            if (currentSession === null) {
+              const sessionInit = { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'layers'] };
+              navigator.xr.requestSession('immersive-vr', sessionInit).then(onSessionStarted).catch(err => {
+                console.error('Error starting WebXR session:', err);
+              });
+            } else {
+              currentSession.end();
+            }
+          };
+        }
+
+        function disableButton() {
+          button.style.display = '';
+          button.style.cursor = 'default';
+          button.onclick = null;
+        }
+
+        function showWebXRNotFound() {
+          disableButton();
+          button.textContent = 'DESKTOP 3D MODE';
+          button.title = 'WebXR Immersive VR is available inside Meta Quest Browser';
+        }
+
+        button.id = 'VRButton';
+
+        if ('xr' in navigator) {
+          button.style.display = 'none';
+          navigator.xr.isSessionSupported('immersive-vr').then(function(supported) {
+            supported ? showEnterVR() : showWebXRNotFound();
+          }).catch(showWebXRNotFound);
+          return button;
+        } else {
+          const message = document.createElement('button');
+          message.id = 'VRButton';
+          message.textContent = 'DESKTOP 3D MODE';
+          message.style.display = 'block';
+          message.style.cursor = 'default';
+          return message;
+        }
+      }
+    }
+  </script>
 
   <style>
     :root {
