@@ -47,32 +47,36 @@
         }
 
         function disableButton() {
-          button.style.display = '';
+          button.style.display = 'block';
           button.style.cursor = 'default';
           button.onclick = null;
         }
 
         function showWebXRNotFound() {
           disableButton();
-          button.textContent = 'DESKTOP 3D MODE';
-          button.title = 'WebXR Immersive VR is available inside Meta Quest Browser';
+          button.textContent = 'DESKTOP 3D MODE (OPEN IN QUEST 2 FOR VR)';
+          button.style.fontSize = '0.78rem';
+          button.style.padding = '10px 18px';
+          button.style.opacity = '0.85';
+          button.style.background = 'rgba(15, 23, 42, 0.9)';
+          button.style.color = '#94a3b8';
+          button.style.border = '1px solid rgba(56, 189, 248, 0.3)';
         }
 
         button.id = 'VRButton';
 
         if ('xr' in navigator) {
-          button.style.display = 'none';
           navigator.xr.isSessionSupported('immersive-vr').then(function(supported) {
-            supported ? showEnterVR() : showWebXRNotFound();
+            if (supported) {
+              showEnterVR();
+            } else {
+              showWebXRNotFound();
+            }
           }).catch(showWebXRNotFound);
           return button;
         } else {
-          const message = document.createElement('button');
-          message.id = 'VRButton';
-          message.textContent = 'DESKTOP 3D MODE';
-          message.style.display = 'block';
-          message.style.cursor = 'default';
-          return message;
+          showWebXRNotFound();
+          return button;
         }
       }
     }
@@ -226,6 +230,11 @@
 
     /* Custom VR Button Styling */
     #VRButton {
+      position: fixed !important;
+      bottom: 30px !important;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
+      z-index: 99999 !important;
       font-family: 'JetBrains Mono', monospace !important;
       font-weight: 700 !important;
       font-size: 1rem !important;
@@ -235,12 +244,12 @@
       color: #030712 !important;
       border: none !important;
       box-shadow: 0 0 25px rgba(56, 189, 248, 0.5) !important;
-      bottom: 30px !important;
       letter-spacing: 0.05em !important;
+      cursor: pointer !important;
       transition: transform 0.2s, box-shadow 0.2s !important;
     }
     #VRButton:hover {
-      transform: scale(1.04) !important;
+      transform: translateX(-50%) scale(1.04) !important;
       box-shadow: 0 0 35px rgba(56, 189, 248, 0.8) !important;
     }
 
