@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Neo-Tokyo Noodle Hearth — VR Walkthrough (Meta Quest 2)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Three.js r128 and official WebXR modules -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/webxr/VRButton.js"></script>
+
+  <style>
+    :root {
+      --cyan: #38bdf8;
+      --amber: #f59e0b;
+      --bg: #030712;
+      --panel: rgba(10, 15, 29, 0.88);
+      --border: rgba(56, 189, 248, 0.25);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: #f8fafc;
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0; left: 0;
+      z-index: 1;
+    }
+
+    /* UI Overlay */
+    .hud-overlay {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px 24px;
+      max-width: 420px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+      pointer-events: auto;
+      transition: opacity 0.3s ease;
+    }
+    .hud-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hud-subtitle {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-bottom: 14px;
+    }
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--cyan);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .badge-gold {
+      background: rgba(245, 158, 11, 0.12);
+      color: #fbbf24;
+      border-color: rgba(245, 158, 11, 0.3);
+    }
+
+    /* Teleport Hotspots */
+    .hotspots-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: #64748b;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      letter-spacing: 0.05em;
+    }
+    .hotspots-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .btn-hotspot {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #e2e8f0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.74rem;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-hotspot:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--cyan);
+      color: #fff;
+    }
+
+    /* Controls Bar */
+    .controls-hint {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .controls-hint b { color: #fff; }
+
+    /* Audio Toggle */
+    .btn-audio {
+      margin-top: 12px;
+      width: 100%;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #fbbf24;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .btn-audio:hover {
+      background: rgba(245, 158, 11, 0.25);
+    }
+
+    /* Custom VR Button Styling */
+    #VRButton {
+      font-family: 'JetBrains Mono', monospace !important;
+      font-weight: 700 !important;
+      font-size: 1rem !important;
+      padding: 14px 28px !important;
+      border-radius: 12px !important;
+      background: var(--cyan) !important;
+      color: #030712 !important;
+      border: none !important;
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.5) !important;
+      bottom: 30px !important;
+      letter-spacing: 0.05em !important;
+      transition: transform 0.2s, box-shadow 0.2s !important;
+    }
+    #VRButton:hover {
+      transform: scale(1.04) !important;
+      box-shadow: 0 0 35px rgba(56, 189, 248, 0.8) !important;
+    }
+
+    /* Loading Spinner */
+    #loader {
+      position: absolute;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: opacity 0.5s ease;
+    }
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(56, 189, 248, 0.2);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-text {
+      font-family: 'Cinzel', serif;
+      font-size: 1.2rem;
+      color: #fff;
+      letter-spacing: 0.05em;
+    }
+    .loader-sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading Screen -->
+  <div id="loader">
+    <div class="spinner"></div>
+    <div class="loader-text">Materializing Cyberpunk Sanctuary...</div>
+    <div class="loader-sub">Loading Neural 3D Geometry (236,894 Triangles)</div>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <!-- HUD Overlay -->
+  <div class="hud-overlay" id="hud">
+    <div class="hud-title"><span>🏮</span> Neo-Tokyo Noodle Hearth</div>
+    <p class="hud-subtitle">AI-generated 3D environment synthesized via Hugging Face ZeroGPU (Tencent WorldMirror 2.0). Explorable in full 6DoF VR on Meta Quest 2.</p>
+    
+    <div class="badge-row">
+      <span class="badge">Hugging Face ZeroGPU</span>
+      <span class="badge badge-gold">236.8k Triangles</span>
+      <span class="badge">6DoF Locomotion</span>
+      <span class="badge">Flush Signage</span>
+    </div>
+
+    <div class="hotspots-label">Explore Hotspots</div>
+    <div class="hotspots-grid">
+      <button class="btn-hotspot" onclick="teleportTo(0, 1.6, 0)">🚪 Entrance</button>
+      <button class="btn-hotspot" onclick="teleportTo(0.6, 1.6, -3.2)">🍜 Noodle Counter</button>
+      <button class="btn-hotspot" onclick="teleportTo(-0.6, 1.6, -5.5)">💡 Neon Wall</button>
+      <button class="btn-hotspot" onclick="teleportTo(0, 1.6, -9.0)">🌧️ Deep Alley</button>
+    </div>
+
+    <div class="controls-hint">
+      <div><b>Quest 2:</b> Left stick glides • Right stick snap turns</div>
+      <div><b>Desktop:</b> WASD to walk • Mouse drag to look</div>
+    </div>
+
+    <button class="btn-audio" id="audio-toggle" onclick="toggleAudio()">
+      <span>🔊</span> Play Rainy Cyberpunk Soundscape
+    </button>
+  </div>
+
+  <script>
+    // Global App State
+    let scene, camera, renderer, dolly, controls;
+    let alleyModel = null;
+    let rainParticles = null;
+    let clock = new THREE.Clock();
+
+    // VR Controllers
+    let controller1, controller2;
+    let snapTurnCooldown = 0;
+
+    // Desktop WASD Navigation
+    const moveState = { forward: 0, right: 0 };
+
+    // Procedural Audio Bed
+    let audioCtx = null;
+    let isAudioPlaying = false;
+    let rainNode = null, humOsc = null, gainNode = null;
+
+    init();
+    animate();
+
+    function init() {
+      const container = document.getElementById('canvas-container');
+
+      // 1. Scene Setup
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x02040a);
+      scene.fog = new THREE.FogExp2(0x02040a, 0.045);
+
+      // 2. Camera & Dolly Rig (Dolly moves through world, camera tracks head)
+      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+      dolly = new THREE.Group();
+      dolly.position.set(0, 0, 0); // Spawn at entrance looking down -Z
+      dolly.add(camera);
+      scene.add(dolly);
+
+      camera.position.set(0, 1.6, 0); // Default eye level on desktop
+
+      // 3. Renderer & WebXR Enablement
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.xr.enabled = true;
+      container.appendChild(renderer.domElement);
+
+      // Attach official WebXR VR Button
+      document.body.appendChild(VRButton.createButton(renderer));
+
+      // 4. Desktop Orbit / Look Controls
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.target.set(0, 1.5, -4); // Look down the alley
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+      controls.maxPolarAngle = Math.PI / 2 + 0.1;
+      controls.minDistance = 0.1;
+      controls.maxDistance = 25;
+
+      // 5. Lighting (Subtle fill, vertex colors provide primary self-illumination)
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+      scene.add(ambientLight);
+
+      // Warm amber lantern point light near ramen shop
+      const lanternLight = new THREE.PointLight(0xf59e0b, 2.5, 12);
+      lanternLight.position.set(1.5, 2.8, -3.5);
+      scene.add(lanternLight);
+
+      // Cool cyan neon point light near left wall
+      const cyanLight = new THREE.PointLight(0x38bdf8, 2.0, 14);
+      cyanLight.position.set(-1.8, 3.2, -5.0);
+      scene.add(cyanLight);
+
+      // 6. Setup VR Controller Grips & Thumbstick Inputs
+      setupVRControllers();
+
+      // 7. Load Neural 3D Alley Scene
+      loadCyberpunkAlley();
+
+      // 8. Add Atmospheric Rain Particles
+      createRain();
+
+      // 9. Event Listeners
+      window.addEventListener('resize', onWindowResize);
+      setupKeyboardControls();
+
+      // Hide HUD when entering VR to preserve pure presence
+      renderer.xr.addEventListener('sessionstart', () => {
+        document.getElementById('hud').style.opacity = '0';
+        document.getElementById('hud').style.pointerEvents = 'none';
+        dolly.position.set(0, 0, 0); // Ground dolly at origin for room-scale VR
+      });
+      renderer.xr.addEventListener('sessionend', () => {
+        document.getElementById('hud').style.opacity = '1';
+        document.getElementById('hud').style.pointerEvents = 'auto';
+      });
+    }
+
+    function loadCyberpunkAlley() {
+      const loader = new THREE.GLTFLoader();
+      const glbPath = 'cyberpunk_alley_scene.glb';
+
+      loader.load(glbPath, (gltf) => {
+        alleyModel = gltf.scene;
+
+        // Apply self-illuminated DoubleSide material to preserve neural vertex colors
+        alleyModel.traverse((child) => {
+          if (child.isMesh) {
+            child.material = new THREE.MeshBasicMaterial({
+              vertexColors: true,
+              side: THREE.DoubleSide
+            });
+          }
+        });
+
+        // Scale by 5.0 to achieve authentic life-size street proportions (~4.5m street width, 12m length)
+        const S = 5.0;
+        alleyModel.scale.set(S, S, S);
+
+        // Position: Ground floor at Y = 0 (offsetting the raw -0.431 transformed min)
+        alleyModel.position.set(0, 0.431 * S, 0);
+
+        scene.add(alleyModel);
+
+        // Dismiss loading screen
+        const loaderEl = document.getElementById('loader');
+        loaderEl.style.opacity = '0';
+        setTimeout(() => loaderEl.style.display = 'none', 500);
+
+        console.log("✓ Cyberpunk Alley GLB loaded and scaled to life-size VR proportions.");
+      }, undefined, (err) => {
+        console.error("Failed to load GLB:", err);
+        document.querySelector('.loader-text').innerText = "Loading Error: Check asset path.";
+      });
+    }
+
+    function createRain() {
+      const rainCount = 1800;
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(rainCount * 3);
+
+      for (let i = 0; i < rainCount; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 12;      // X: Street width
+        positions[i * 3 + 1] = Math.random() * 10;          // Y: Height
+        positions[i * 3 + 2] = -Math.random() * 15;         // Z: Street length
+      }
+
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+      const material = new THREE.PointsMaterial({
+        color: 0x7dd3fc,
+        size: 0.035,
+        transparent: true,
+        opacity: 0.65
+      });
+
+      rainParticles = new THREE.Points(geometry, material);
+      scene.add(rainParticles);
+    }
+
+    function setupVRControllers() {
+      // Setup Controller 0 & 1 for ray pointers and thumbstick reading
+      controller1 = renderer.xr.getController(0);
+      controller2 = renderer.xr.getController(1);
+
+      dolly.add(controller1);
+      dolly.add(controller2);
+
+      const controllerModelFactory = {
+        createPointer: () => {
+          const geom = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(0, 0, -1.5)
+          ]);
+          const mat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.4 });
+          return new THREE.Line(geom, mat);
+        }
+      };
+
+      controller1.add(controllerModelFactory.createPointer());
+      controller2.add(controllerModelFactory.createPointer());
+    }
+
+    function handleVRLocomotion(delta) {
+      if (!renderer.xr.isPresenting) return;
+
+      const session = renderer.xr.getSession();
+      if (!session) return;
+
+      for (const source of session.inputSources) {
+        if (!source.gamepad) continue;
+        const gp = source.gamepad;
+
+        // Left Controller: Smooth Locomotion (Axes 2 & 3 or 0 & 1)
+        if (source.handedness === 'left') {
+          const axisX = gp.axes[2] !== undefined ? gp.axes[2] : gp.axes[0];
+          const axisY = gp.axes[3] !== undefined ? gp.axes[3] : gp.axes[1];
+
+          if (Math.abs(axisX) > 0.15 || Math.abs(axisY) > 0.15) {
+            // Get camera yaw
+            const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+            euler.setFromQuaternion(camera.quaternion);
+
+            const moveSpeed = 2.4 * delta; // 2.4 m/s gliding speed
+            const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), euler.y);
+            const side = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), euler.y);
+
+            dolly.position.addScaledVector(forward, -axisY * moveSpeed);
+            dolly.position.addScaledVector(side, axisX * moveSpeed);
+          }
+        }
+
+        // Right Controller: Astra Comfort Snap Turning (Axes 2 or 0)
+        if (source.handedness === 'right') {
+          const turnAxis = gp.axes[2] !== undefined ? gp.axes[2] : gp.axes[0];
+          snapTurnCooldown -= delta;
+
+          if (Math.abs(turnAxis) > 0.65 && snapTurnCooldown <= 0) {
+            const snapAngle = Math.PI / 6; // 30-degree snap turn
+            const direction = turnAxis > 0 ? -1 : 1;
+            dolly.rotation.y += direction * snapAngle;
+            snapTurnCooldown = 0.35; // 350ms cooldown
+          }
+        }
+      }
+    }
+
+    function setupKeyboardControls() {
+      window.addEventListener('keydown', (e) => {
+        switch (e.code) {
+          case 'KeyW': case 'ArrowUp': moveState.forward = 1; break;
+          case 'KeyS': case 'ArrowDown': moveState.forward = -1; break;
+          case 'KeyA': case 'ArrowLeft': moveState.right = -1; break;
+          case 'KeyD': case 'ArrowRight': moveState.right = 1; break;
+        }
+      });
+      window.addEventListener('keyup', (e) => {
+        switch (e.code) {
+          case 'KeyW': case 'ArrowUp':
+          case 'KeyS': case 'ArrowDown': moveState.forward = 0; break;
+          case 'KeyA': case 'ArrowLeft':
+          case 'KeyD': case 'ArrowRight': moveState.right = 0; break;
+        }
+      });
+    }
+
+    function updateDesktopMovement(delta) {
+      if (renderer.xr.isPresenting) return;
+
+      if (moveState.forward !== 0 || moveState.right !== 0) {
+        const moveSpeed = 3.5 * delta;
+        const forward = new THREE.Vector3();
+        camera.getWorldDirection(forward);
+        forward.y = 0;
+        forward.normalize();
+
+        const side = new THREE.Vector3(-forward.z, 0, forward.x);
+
+        const deltaPos = new THREE.Vector3()
+          .addScaledVector(forward, moveState.forward * moveSpeed)
+          .addScaledVector(side, moveState.right * moveSpeed);
+
+        camera.position.add(deltaPos);
+        controls.target.add(deltaPos);
+      }
+    }
+
+    function teleportTo(x, y, z) {
+      if (renderer.xr.isPresenting) {
+        dolly.position.set(x, 0, z);
+      } else {
+        camera.position.set(x, y, z);
+        controls.target.set(x, y - 0.1, z - 3);
+      }
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function animate() {
+      renderer.setAnimationLoop(render);
+    }
+
+    function render() {
+      const delta = clock.getDelta();
+
+      // Handle locomotion inputs
+      handleVRLocomotion(delta);
+      updateDesktopMovement(delta);
+
+      if (!renderer.xr.isPresenting) {
+        controls.update();
+      }
+
+      // Animate Rain
+      if (rainParticles) {
+        const pos = rainParticles.geometry.attributes.position.array;
+        for (let i = 1; i < pos.length; i += 3) {
+          pos[i] -= 7.5 * delta; // Fall speed
+          if (pos[i] < 0) pos[i] = 10;
+        }
+        rainParticles.geometry.attributes.position.needsUpdate = true;
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // Procedural Ambient Rain & Neon Soundscape
+    function toggleAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // 1. Rain Pink Noise Buffer
+        const bufferSize = audioCtx.sampleRate * 2;
+        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        let b0 = 0, b1 = 0, b2 = 0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          b0 = 0.99886 * b0 + white * 0.0555179;
+          b1 = 0.99332 * b1 + white * 0.0750759;
+          b2 = 0.96900 * b2 + white * 0.1538520;
+          output[i] = (b0 + b1 + b2) * 0.08;
+        }
+
+        rainNode = audioCtx.createBufferSource();
+        rainNode.buffer = noiseBuffer;
+        rainNode.loop = true;
+
+        const rainFilter = audioCtx.createBiquadFilter();
+        rainFilter.type = 'lowpass';
+        rainFilter.frequency.value = 1800;
+
+        gainNode = audioCtx.createGain();
+        gainNode.gain.value = 0.45;
+
+        // 2. 60Hz Neon Electrical Hum
+        humOsc = audioCtx.createOscillator();
+        humOsc.type = 'sawtooth';
+        humOsc.frequency.value = 60;
+        const humGain = audioCtx.createGain();
+        humGain.gain.value = 0.025;
+
+        const humFilter = audioCtx.createBiquadFilter();
+        humFilter.type = 'lowpass';
+        humFilter.frequency.value = 180;
+
+        // Wiring
+        rainNode.connect(rainFilter);
+        rainFilter.connect(gainNode);
+
+        humOsc.connect(humFilter);
+        humFilter.connect(gainNode);
+
+        gainNode.connect(audioCtx.destination);
+
+        rainNode.start();
+        humOsc.start();
+        isAudioPlaying = true;
+        document.getElementById('audio-toggle').innerHTML = "<span>🔊</span> Mute Ambient Soundscape";
+      } else {
+        if (isAudioPlaying) {
+          gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+          isAudioPlaying = false;
+          document.getElementById('audio-toggle').innerHTML = "<span>🔇</span> Play Ambient Soundscape";
+        } else {
+          gainNode.gain.linearRampToValueAtTime(0.45, audioCtx.currentTime + 0.3);
+          isAudioPlaying = true;
+          document.getElementById('audio-toggle').innerHTML = "<span>🔊</span> Mute Ambient Soundscape";
+        }
+      }
+    }
+  </script>
+</body>
+</html>
